@@ -1,32 +1,28 @@
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:go_router/go_router.dart';
+import '../models/station.dart';
 
 class MapUtils {
-  static Future<void> launchMaps(BuildContext context, double lat, double lng) async {
-    // URL pour l'itinéraire via OpenStreetMap (OSRM)
-    // Format: destination lat,lng
-    final Uri url = Uri.parse('https://www.openstreetmap.org/directions?engine=fossgis_osrm_car&route=;$lat,$lng');
-    
-    // Alternative via protocole géo pour laisser le choix à l'utilisateur sur mobile
-    final Uri geoUrl = Uri.parse('geo:$lat,$lng?q=$lat,$lng');
+  static Future<void> launchMaps(
+    BuildContext context,
+    Station station,
+  ) async {
+    context.push('/navigate', extra: station);
+  }
 
-    try {
-      // On tente d'abord d'ouvrir une application capable de gérer le lien OSM ou géo
-      if (await canLaunchUrl(geoUrl)) {
-        await launchUrl(geoUrl);
-      } else if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Impossible d\'ouvrir la navigation')),
-          );
-        }
-      }
-    } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erreur: $e')),
-        );
-      }
+  static String getDistanceText(Position? position, double endLat, double endLng) {
+    if (position == null) return '- km';
+    final distInMeters = Geolocator.distanceBetween(
+      position.latitude,
+      position.longitude,
+      endLat,
+      endLng,
+    );
+    if (distInMeters < 1000) {
+      return '${distInMeters.toStringAsFixed(0)} m';
+    } else {
+      return '${(distInMeters / 1000).toStringAsFixed(1)} km';
     }
   }
 }

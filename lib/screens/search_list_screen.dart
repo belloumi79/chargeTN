@@ -6,6 +6,7 @@ import '../core/app_colors.dart';
 import '../widgets/app_bottom_nav.dart';
 import '../widgets/responsive_wrapper.dart';
 import '../core/map_utils.dart';
+import '../providers/location_provider.dart';
 
 class SearchListScreen extends ConsumerStatefulWidget {
   const SearchListScreen({super.key});
@@ -28,6 +29,7 @@ class _SearchListScreenState extends ConsumerState<SearchListScreen> {
   @override
   Widget build(BuildContext context) {
     final stationsAsync = ref.watch(stationsProvider);
+    final locationAsync = ref.watch(userLocationProvider);
 
     return Scaffold(
       backgroundColor: AppColors.backgroundDark,
@@ -47,7 +49,11 @@ class _SearchListScreenState extends ConsumerState<SearchListScreen> {
                     const Expanded(
                       child: Text(
                         'Trouver une borne',
-                        style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
                         textAlign: TextAlign.center,
                       ),
                     ),
@@ -60,7 +66,10 @@ class _SearchListScreenState extends ConsumerState<SearchListScreen> {
               ),
               // ── Search bar ────────────────────────────────────────────────────
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
                 child: Container(
                   height: 48,
                   decoration: BoxDecoration(
@@ -72,25 +81,40 @@ class _SearchListScreenState extends ConsumerState<SearchListScreen> {
                     children: [
                       const Padding(
                         padding: EdgeInsets.only(left: 14),
-                        child: Icon(Icons.search, color: AppColors.textSecondary),
+                        child: Icon(
+                          Icons.search,
+                          color: AppColors.textSecondary,
+                        ),
                       ),
                       Expanded(
                         child: TextField(
                           controller: _searchController,
-                          style: const TextStyle(color: Colors.white, fontSize: 15),
-                          onChanged: (v) => setState(() => _query = v.toLowerCase()),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 15,
+                          ),
+                          onChanged: (v) =>
+                              setState(() => _query = v.toLowerCase()),
                           decoration: InputDecoration(
                             hintText: 'Chercher une ville ou une station',
-                            hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.3), fontSize: 14),
+                            hintStyle: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.3),
+                              fontSize: 14,
+                            ),
                             border: InputBorder.none,
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 10),
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                            ),
                             isDense: true,
                           ),
                         ),
                       ),
                       if (_query.isNotEmpty)
                         IconButton(
-                          icon: Icon(Icons.cancel, color: Colors.white.withValues(alpha: 0.4)),
+                          icon: Icon(
+                            Icons.cancel,
+                            color: Colors.white.withValues(alpha: 0.4),
+                          ),
                           onPressed: () {
                             _searchController.clear();
                             setState(() => _query = '');
@@ -114,21 +138,41 @@ class _SearchListScreenState extends ConsumerState<SearchListScreen> {
                       onTap: () => setState(() => _activeFilter = i),
                       child: AnimatedContainer(
                         duration: const Duration(milliseconds: 180),
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 6,
+                        ),
                         decoration: BoxDecoration(
-                          color: active ? AppColors.primary : AppColors.surfaceDark,
+                          color: active
+                              ? AppColors.primary
+                              : AppColors.surfaceDark,
                           borderRadius: BorderRadius.circular(999),
-                          border: Border.all(color: active ? Colors.transparent : Colors.white.withValues(alpha: 0.07)),
+                          border: Border.all(
+                            color: active
+                                ? Colors.transparent
+                                : Colors.white.withValues(alpha: 0.07),
+                          ),
                           boxShadow: active
-                              ? [BoxShadow(color: AppColors.primary.withValues(alpha: 0.35), blurRadius: 8)]
+                              ? [
+                                  BoxShadow(
+                                    color: AppColors.primary.withValues(
+                                      alpha: 0.35,
+                                    ),
+                                    blurRadius: 8,
+                                  ),
+                                ]
                               : [],
                         ),
                         child: Text(
                           _filters[i],
                           style: TextStyle(
-                            color: active ? AppColors.backgroundDark : AppColors.textSecondary,
+                            color: active
+                                ? AppColors.backgroundDark
+                                : AppColors.textSecondary,
                             fontSize: 13,
-                            fontWeight: active ? FontWeight.w700 : FontWeight.w500,
+                            fontWeight: active
+                                ? FontWeight.w700
+                                : FontWeight.w500,
                           ),
                         ),
                       ),
@@ -140,24 +184,104 @@ class _SearchListScreenState extends ConsumerState<SearchListScreen> {
               // ── Results header ────────────────────────────────────────────────
               stationsAsync.when(
                 data: (stations) {
-                  final filtered = stations.where((s) {
-                    if (_query.isEmpty) return true;
-                    return (s.name ?? '').toLowerCase().contains(_query) ||
+                   final filtered = stations.where((s) {
+                    if (!s.verified) return false;
+                    
+                    // Text search
+                    final matchesQuery = _query.isEmpty ||
+                        (s.name ?? '').toLowerCase().contains(_query) ||
                         (s.address?.toLowerCase().contains(_query) ?? false);
+                    if (!matchesQuery) return false;
+
+                    // Active filter
+                    switch (_activeFilter) {
+                      case 0: // Tous
+                        return true;
+                      case 1: // Disponible
+                        final sLow = s.statut.toLowerCase();
+                        return sLow.contains('fonct') || sLow.contains('disp') || sLow.contains('ouvert');
+                      case 2: // Rapide (≥ 50 kW)
+                        return s.puissanceKw.any((p) {
+                          // Clean string from "kW", "kw", etc.
+                          final cleanP = p.toLowerCase().replaceAll('kw', '').replaceAll(' ', '').trim();
+                          final kw = double.tryParse(cleanP) ?? 0;
+                          return kw >= 50;
+                        });
+                      case 3: // Gratuit (Placeholder - always true for now)
+                        return true;
+                      case 4: // Type 2
+                        return s.typePrise.any((t) {
+                          final tLow = t.toLowerCase();
+                          return tLow.contains('type 2') || tLow.contains('type2') || tLow.contains('iec');
+                        });
+                      default:
+                        return true;
+                    }
                   }).toList();
+
+                  if (filtered.isEmpty) {
+                    return Expanded(
+                      child: Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.ev_station_outlined,
+                              color: AppColors.textSecondary,
+                              size: 64,
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              _query.isEmpty
+                                  ? 'Aucune borne disponible'
+                                  : 'Aucun résultat pour "$_query"',
+                              style: const TextStyle(
+                                color: AppColors.textSecondary,
+                                fontSize: 16,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            const Text(
+                              'Vérifiez ultérieurement ou ajoutez une nouvelle borne.',
+                              style: TextStyle(
+                                color: AppColors.textSecondary,
+                                fontSize: 13,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  }
 
                   return Expanded(
                     child: Column(
                       children: [
                         Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 6,
+                          ),
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Text('${filtered.length} résultats',
-                                  style: const TextStyle(color: AppColors.textSecondary, fontSize: 13, fontWeight: FontWeight.w600)),
-                              const Text('Trier: Recommandé',
-                                  style: TextStyle(color: AppColors.primary, fontSize: 12, fontWeight: FontWeight.w500)),
+                              Text(
+                                '${filtered.length} résultats',
+                                style: const TextStyle(
+                                  color: AppColors.textSecondary,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              const Text(
+                                'Trier: Recommandé',
+                                style: TextStyle(
+                                  color: AppColors.primary,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
                             ],
                           ),
                         ),
@@ -165,18 +289,28 @@ class _SearchListScreenState extends ConsumerState<SearchListScreen> {
                           child: ListView.separated(
                             padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
                             itemCount: filtered.length,
-                            separatorBuilder: (_, _) => const SizedBox(height: 12),
+                            separatorBuilder: (_, _) =>
+                                const SizedBox(height: 12),
                             itemBuilder: (context, i) {
                               final station = filtered[i];
-                              final statusColor = AppColors.statusColor(station.statut);
+                              final statusColor = AppColors.statusColor(
+                                station.statut,
+                              );
                               return GestureDetector(
-                                onTap: () => context.push('/station/${station.id}', extra: station),
+                                onTap: () => context.push(
+                                  '/station/${station.id}',
+                                  extra: station,
+                                ),
                                 child: Container(
                                   padding: const EdgeInsets.all(14),
                                   decoration: BoxDecoration(
                                     color: AppColors.surfaceDark,
                                     borderRadius: BorderRadius.circular(14),
-                                    border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+                                    border: Border.all(
+                                      color: Colors.white.withValues(
+                                        alpha: 0.05,
+                                      ),
+                                    ),
                                   ),
                                   child: Row(
                                     children: [
@@ -184,27 +318,47 @@ class _SearchListScreenState extends ConsumerState<SearchListScreen> {
                                       Stack(
                                         children: [
                                           Container(
-                                            width: 72, height: 72,
+                                            width: 72,
+                                            height: 72,
                                             decoration: BoxDecoration(
                                               color: AppColors.backgroundDark,
-                                              borderRadius: BorderRadius.circular(10),
-                                              border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+                                              borderRadius:
+                                                  BorderRadius.circular(10),
+                                              border: Border.all(
+                                                color: Colors.white.withValues(
+                                                  alpha: 0.1,
+                                                ),
+                                              ),
                                             ),
-                                            child: const Icon(Icons.ev_station, color: AppColors.primary, size: 32),
+                                            child: const Icon(
+                                              Icons.ev_station,
+                                              color: AppColors.primary,
+                                              size: 32,
+                                            ),
                                           ),
                                           Positioned(
-                                            bottom: -2, right: -2,
+                                            bottom: -2,
+                                            right: -2,
                                             child: Container(
-                                              width: 18, height: 18,
+                                              width: 18,
+                                              height: 18,
                                               decoration: BoxDecoration(
                                                 color: AppColors.surfaceDark,
                                                 shape: BoxShape.circle,
-                                                border: Border.all(color: AppColors.backgroundDark, width: 2),
+                                                border: Border.all(
+                                                  color:
+                                                      AppColors.backgroundDark,
+                                                  width: 2,
+                                                ),
                                               ),
                                               child: Center(
                                                 child: Container(
-                                                  width: 8, height: 8,
-                                                  decoration: BoxDecoration(color: statusColor, shape: BoxShape.circle),
+                                                  width: 8,
+                                                  height: 8,
+                                                  decoration: BoxDecoration(
+                                                    color: statusColor,
+                                                    shape: BoxShape.circle,
+                                                  ),
                                                 ),
                                               ),
                                             ),
@@ -214,61 +368,122 @@ class _SearchListScreenState extends ConsumerState<SearchListScreen> {
                                       const SizedBox(width: 12),
                                       Expanded(
                                         child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
                                           children: [
                                             Row(
-                                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                              mainAxisAlignment:
+                                                  MainAxisAlignment
+                                                      .spaceBetween,
                                               children: [
                                                 Expanded(
                                                   child: Text(
                                                     station.name ?? 'Station',
-                                                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 14),
-                                                    overflow: TextOverflow.ellipsis,
+                                                    style: const TextStyle(
+                                                      color: Colors.white,
+                                                      fontWeight:
+                                                          FontWeight.w700,
+                                                      fontSize: 14,
+                                                    ),
+                                                    overflow:
+                                                        TextOverflow.ellipsis,
                                                   ),
                                                 ),
-                                                Text(
-                                                  '${(station.latitude * 10 % 15).abs().toStringAsFixed(1)} km',
-                                                  style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold, fontSize: 13),
-                                                ),
+                                                  Text(
+                                                    MapUtils.getDistanceText(locationAsync.value, station.latitude, station.longitude),
+                                                    style: const TextStyle(
+                                                      color: AppColors.primary,
+                                                      fontWeight: FontWeight.bold,
+                                                      fontSize: 13,
+                                                    ),
+                                                  ),
                                               ],
                                             ),
                                             if (station.address != null)
                                               Text(
                                                 station.address!,
-                                                style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
+                                                style: const TextStyle(
+                                                  color:
+                                                      AppColors.textSecondary,
+                                                  fontSize: 12,
+                                                ),
                                                 overflow: TextOverflow.ellipsis,
                                               ),
                                             const SizedBox(height: 6),
                                             Row(
                                               children: [
                                                 Container(
-                                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                  padding:
+                                                      const EdgeInsets.symmetric(
+                                                        horizontal: 6,
+                                                        vertical: 2,
+                                                      ),
                                                   decoration: BoxDecoration(
-                                                    color: statusColor.withValues(alpha: 0.12),
-                                                    borderRadius: BorderRadius.circular(6),
-                                                    border: Border.all(color: statusColor.withValues(alpha: 0.3)),
+                                                    color: statusColor
+                                                        .withValues(
+                                                          alpha: 0.12,
+                                                        ),
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                          6,
+                                                        ),
+                                                    border: Border.all(
+                                                      color: statusColor
+                                                          .withValues(
+                                                            alpha: 0.3,
+                                                          ),
+                                                    ),
                                                   ),
                                                   child: Text(
                                                     station.statut,
-                                                    style: TextStyle(color: statusColor, fontSize: 10, fontWeight: FontWeight.w600),
+                                                    style: TextStyle(
+                                                      color: statusColor,
+                                                      fontSize: 10,
+                                                      fontWeight:
+                                                          FontWeight.w600,
+                                                    ),
                                                   ),
                                                 ),
                                                 const SizedBox(width: 8),
-                                                const Icon(Icons.bolt, color: AppColors.textSecondary, size: 14),
+                                                const Icon(
+                                                  Icons.bolt,
+                                                  color:
+                                                      AppColors.textSecondary,
+                                                  size: 14,
+                                                ),
                                                 Text(
                                                   '${station.puissanceKw.isNotEmpty ? station.puissanceKw.first : '22'} kW',
-                                                  style: const TextStyle(color: AppColors.textSecondary, fontSize: 11),
+                                                  style: const TextStyle(
+                                                    color:
+                                                        AppColors.textSecondary,
+                                                    fontSize: 11,
+                                                  ),
                                                 ),
                                                 const Spacer(),
                                                 GestureDetector(
-                                                  onTap: () => MapUtils.launchMaps(context, station.latitude, station.longitude),
+                                                  onTap: () =>
+                                                      MapUtils.launchMaps(
+                                                        context,
+                                                        station,
+                                                      ),
                                                   child: Container(
-                                                    width: 30, height: 30,
+                                                    width: 30,
+                                                    height: 30,
                                                     decoration: BoxDecoration(
-                                                      color: Colors.white.withValues(alpha: 0.05),
-                                                      borderRadius: BorderRadius.circular(999),
+                                                      color: Colors.white
+                                                          .withValues(
+                                                            alpha: 0.05,
+                                                          ),
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                            999,
+                                                          ),
                                                     ),
-                                                    child: const Icon(Icons.directions, color: AppColors.primary, size: 16),
+                                                    child: const Icon(
+                                                      Icons.directions,
+                                                      color: AppColors.primary,
+                                                      size: 16,
+                                                    ),
                                                   ),
                                                 ),
                                               ],
@@ -287,8 +502,19 @@ class _SearchListScreenState extends ConsumerState<SearchListScreen> {
                     ),
                   );
                 },
-                loading: () => const Expanded(child: Center(child: CircularProgressIndicator(color: AppColors.primary))),
-                error: (e, _) => Expanded(child: Center(child: Text('Erreur: $e', style: const TextStyle(color: Colors.white)))),
+                loading: () => const Expanded(
+                  child: Center(
+                    child: CircularProgressIndicator(color: AppColors.primary),
+                  ),
+                ),
+                error: (e, _) => Expanded(
+                  child: Center(
+                    child: Text(
+                      'Erreur: $e',
+                      style: const TextStyle(color: Colors.white),
+                    ),
+                  ),
+                ),
               ),
             ],
           ),

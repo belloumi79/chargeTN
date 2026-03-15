@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -18,24 +19,64 @@ class _AuthScreenState extends State<AuthScreen> {
   final _passwordController = TextEditingController();
   bool _isLoading = false;
   bool _isSignUp = false;
+  StreamSubscription<AuthState>? _authSubscription;
+
+  @override
+  void initState() {
+    super.initState();
+    _authSubscription = SupabaseConfig.client.auth.onAuthStateChange.listen((data) {
+      final session = data.session;
+      if (session != null && mounted) {
+        final user = session.user;
+        final userEmail = user.email ?? '';
+        final isAdmin = user.userMetadata?['role'] == 'admin' ||
+            userEmail == 'belloumi.karim.professional@gmail.com';
+        context.go(isAdmin ? '/admin' : '/home');
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _authSubscription?.cancel();
+    _emailController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
 
   Future<void> _signIn() async {
     setState(() => _isLoading = true);
     try {
+      String email = _emailController.text.trim();
+      String password = _passwordController.text.trim();
+
+      // Admin shortcut
+      if (email.toLowerCase() == 'admin' && password == '123456') {
+        email = 'admin@charge.tn';
+      }
+
       await SupabaseConfig.client.auth.signInWithPassword(
-        email: _emailController.text.trim(),
-        password: _passwordController.text.trim(),
+        email: email,
+        password: password,
       );
-      if (mounted) context.go('/home');
+      final user = SupabaseConfig.client.auth.currentUser;
+      final userEmail = user?.email ?? '';
+      final isAdmin =
+          user?.userMetadata?['role'] == 'admin' ||
+          userEmail == 'belloumi.karim.professional@gmail.com' ||
+          userEmail == 'admin@charge.tn';
+      if (mounted) context.go(isAdmin ? '/admin' : '/home');
     } on AuthException catch (error) {
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(error.message)));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(error.message)));
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Une erreur est survenue')));
+          const SnackBar(content: Text('Une erreur est survenue')),
+        );
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -50,18 +91,47 @@ class _AuthScreenState extends State<AuthScreen> {
         password: _passwordController.text.trim(),
       );
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-            content: Text('Inscription réussie! Vérifiez votre email.')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Inscription réussie! Vérifiez votre email.'),
+          ),
+        );
       }
     } on AuthException catch (error) {
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(error.message)));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(error.message)));
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Une erreur est survenue')));
+          const SnackBar(content: Text('Une erreur est survenue')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _signInWithFacebook() async {
+    setState(() => _isLoading = true);
+    try {
+      await SupabaseConfig.client.auth.signInWithOAuth(
+        OAuthProvider.facebook,
+        redirectTo: kIsWeb ? null : 'io.supabase.facebookauth://login-callback',
+      );
+    } on AuthException catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(error.message)));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Erreur lors de la connexion Facebook')),
+        );
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -90,7 +160,9 @@ class _AuthScreenState extends State<AuthScreen> {
                   flex: 3,
                   child: Container(
                     decoration: const BoxDecoration(
-                      border: Border(right: BorderSide(color: Color(0xFF1A2A1A), width: 1)),
+                      border: Border(
+                        right: BorderSide(color: Color(0xFF1A2A1A), width: 1),
+                      ),
                     ),
                     child: Stack(
                       fit: StackFit.expand,
@@ -144,7 +216,10 @@ class _AuthScreenState extends State<AuthScreen> {
                 flex: 2,
                 child: Center(
                   child: SingleChildScrollView(
-                    padding: const EdgeInsets.symmetric(horizontal: 48, vertical: 24),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 48,
+                      vertical: 24,
+                    ),
                     child: ConstrainedBox(
                       constraints: const BoxConstraints(maxWidth: 400),
                       child: Column(
@@ -158,7 +233,9 @@ class _AuthScreenState extends State<AuthScreen> {
                               borderRadius: BorderRadius.circular(20),
                               boxShadow: [
                                 BoxShadow(
-                                  color: AppColors.primary.withValues(alpha: 0.1),
+                                  color: AppColors.primary.withValues(
+                                    alpha: 0.1,
+                                  ),
                                   blurRadius: 20,
                                   spreadRadius: 5,
                                 ),
@@ -166,20 +243,26 @@ class _AuthScreenState extends State<AuthScreen> {
                             ),
                             child: ClipRRect(
                               borderRadius: BorderRadius.circular(20),
-                              child: Image.asset('assets/images/logo.png', fit: BoxFit.contain),
+                              child: Image.asset(
+                                'assets/images/logo.png',
+                                fit: BoxFit.contain,
+                              ),
                             ),
                           ),
                           const SizedBox(height: 24),
                           const Text(
                             'Bienvenue',
                             style: TextStyle(
-                                fontSize: 32,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white),
+                              fontSize: 32,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
                           ),
                           const SizedBox(height: 8),
                           Text(
-                            _isSignUp ? 'Créez votre compte pour commencer' : 'Reconnectez-vous à votre espace',
+                            _isSignUp
+                                ? 'Créez votre compte pour commencer'
+                                : 'Reconnectez-vous à votre espace',
                             textAlign: TextAlign.center,
                             style: const TextStyle(color: Color(0xFF9DB9B0)),
                           ),
@@ -189,7 +272,10 @@ class _AuthScreenState extends State<AuthScreen> {
                             controller: _emailController,
                             decoration: const InputDecoration(
                               labelText: 'Email',
-                              prefixIcon: Icon(Icons.email_outlined, color: AppColors.primary),
+                              prefixIcon: Icon(
+                                Icons.email_outlined,
+                                color: AppColors.primary,
+                              ),
                             ),
                             keyboardType: TextInputType.emailAddress,
                             style: const TextStyle(color: Colors.white),
@@ -199,14 +285,19 @@ class _AuthScreenState extends State<AuthScreen> {
                             controller: _passwordController,
                             decoration: const InputDecoration(
                               labelText: 'Mot de passe',
-                              prefixIcon: Icon(Icons.lock_outlined, color: AppColors.primary),
+                              prefixIcon: Icon(
+                                Icons.lock_outlined,
+                                color: AppColors.primary,
+                              ),
                             ),
                             obscureText: true,
                             style: const TextStyle(color: Colors.white),
                           ),
                           const SizedBox(height: 40),
                           if (_isLoading)
-                            const CircularProgressIndicator(color: AppColors.primary)
+                            const CircularProgressIndicator(
+                              color: AppColors.primary,
+                            )
                           else
                             Column(
                               children: [
@@ -215,20 +306,86 @@ class _AuthScreenState extends State<AuthScreen> {
                                   height: 50,
                                   child: ElevatedButton(
                                     onPressed: _isSignUp ? _signUp : _signIn,
-                                    child: Text(_isSignUp ? 'S\'inscrire' : 'Se connecter'),
+                                    child: Text(
+                                      _isSignUp
+                                          ? 'S\'inscrire'
+                                          : 'Se connecter',
+                                    ),
                                   ),
                                 ),
                                 const SizedBox(height: 20),
                                 TextButton(
-                                  onPressed: () => setState(() => _isSignUp = !_isSignUp),
+                                  onPressed: () =>
+                                      setState(() => _isSignUp = !_isSignUp),
                                   child: Text(
                                     _isSignUp
                                         ? 'Déjà un compte ? Connectez-vous'
                                         : 'Pas encore de compte ? Inscrivez-vous',
-                                    style: const TextStyle(color: AppColors.primary),
+                                    style: const TextStyle(
+                                      color: AppColors.primary,
+                                    ),
                                   ),
                                 ),
-                                const SizedBox(height: 12),
+                                const SizedBox(height: 24),
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: Divider(
+                                        color: Colors.white.withValues(
+                                          alpha: 0.1,
+                                        ),
+                                      ),
+                                    ),
+                                    Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 16,
+                                      ),
+                                      child: Text(
+                                        'OU',
+                                        style: TextStyle(
+                                          color: Colors.white.withValues(
+                                            alpha: 0.3,
+                                          ),
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                    ),
+                                    Expanded(
+                                      child: Divider(
+                                        color: Colors.white.withValues(
+                                          alpha: 0.1,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 24),
+                                SizedBox(
+                                  width: double.infinity,
+                                  height: 50,
+                                  child: OutlinedButton.icon(
+                                    onPressed: _signInWithFacebook,
+                                    icon: const Icon(
+                                      Icons.facebook,
+                                      color: Color(0xFF1877F2),
+                                    ),
+                                    label: const Text(
+                                      'Continuer avec Facebook',
+                                      style: TextStyle(color: Colors.white),
+                                    ),
+                                    style: OutlinedButton.styleFrom(
+                                      side: BorderSide(
+                                        color: Colors.white.withValues(
+                                          alpha: 0.1,
+                                        ),
+                                      ),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 20),
                                 TextButton(
                                   onPressed: () => context.go('/home'),
                                   child: const Text(

@@ -1,4 +1,5 @@
-import 'dart:io';
+import 'dart:io' show File;
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
@@ -21,7 +22,7 @@ class _AddStationScreenState extends ConsumerState<AddStationScreen> {
   final _priceController = TextEditingController();
 
   final _picker = ImagePicker();
-  File? _image;
+  XFile? _image;
   bool _isLoading = false;
   bool _is24h = false;
 
@@ -30,6 +31,40 @@ class _AddStationScreenState extends ConsumerState<AddStationScreen> {
 
   final _connectors = ['Type 2', 'CCS 2', 'CHAdeMO'];
   final _powers = ['7', '11', '22', '50', '150'];
+  Position? _currentPosition;
+
+  @override
+  void initState() {
+    super.initState();
+    _getLocation();
+  }
+
+  Future<void> _getLocation() async {
+    try {
+      bool svcEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!svcEnabled) {
+        if (mounted) _snack('Service de localisation désactivé.');
+        return;
+      }
+      LocationPermission perm = await Geolocator.checkPermission();
+      if (perm == LocationPermission.denied) {
+        perm = await Geolocator.requestPermission();
+      }
+      if (perm == LocationPermission.denied || perm == LocationPermission.deniedForever) {
+        if (mounted) _snack('Permission de localisation refusée.');
+        return;
+      }
+      final pos = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+        timeLimit: const Duration(seconds: 10),
+      );
+      if (mounted) {
+        setState(() => _currentPosition = pos);
+      }
+    } catch (e) {
+      if (mounted) _snack('Erreur localisation: $e');
+    }
+  }
 
   @override
   void dispose() {
@@ -77,7 +112,7 @@ class _AddStationScreenState extends ConsumerState<AddStationScreen> {
     );
     if (source != null) {
       final picked = await _picker.pickImage(source: source, imageQuality: 80);
-      if (picked != null) setState(() => _image = File(picked.path));
+      if (picked != null) setState(() => _image = picked);
     }
   }
 
@@ -92,21 +127,19 @@ class _AddStationScreenState extends ConsumerState<AddStationScreen> {
 
     setState(() => _isLoading = true);
     try {
-      // Géolocalisation
-      bool svcEnabled = await Geolocator.isLocationServiceEnabled();
-      if (!svcEnabled) { _snack('Service de localisation désactivé.'); return; }
-      LocationPermission perm = await Geolocator.checkPermission();
-      if (perm == LocationPermission.denied) perm = await Geolocator.requestPermission();
-      if (perm == LocationPermission.denied || perm == LocationPermission.deniedForever) {
-        _snack('Permission refusée.'); return;
+      final pos = _currentPosition;
+      if (pos == null) {
+        _snack('Position non acquise. Veuillez patienter ou cliquer sur Localiser.');
+        setState(() => _isLoading = false);
+        return;
       }
-      final pos = await Geolocator.getCurrentPosition();
 
       // Upload image
-      final ext = p.extension(_image!.path);
+      final ext = p.extension(_image!.name);
       final fileName = '${DateTime.now().millisecondsSinceEpoch}$ext';
       final storagePath = '${user.id}/$fileName';
-      await SupabaseConfig.client.storage.from('proofs').upload(storagePath, _image!);
+      final bytes = await _image!.readAsBytes();
+      await SupabaseConfig.client.storage.from('proofs').uploadBinary(storagePath, bytes);
       final imageUrl = SupabaseConfig.client.storage.from('proofs').getPublicUrl(storagePath);
 
       // Insert station
@@ -194,9 +227,12 @@ class _AddStationScreenState extends ConsumerState<AddStationScreen> {
                         ),
                         const SizedBox(height: 8),
                         _GhostButton(
-                          icon: Icons.map_outlined,
-                          label: 'Localiser sur la carte',
-                          onTap: () {},
+                          icon: _currentPosition == null ? Icons.location_searching : Icons.location_on,
+                          label: _currentPosition == null 
+                              ? 'Localisation en cours...' 
+                              : 'Position acquise (${_currentPosition!.latitude.toStringAsFixed(4)}, ${_currentPosition!.longitude.toStringAsFixed(4)})',
+                          isLoading: _currentPosition == null,
+                          onTap: _getLocation,
                         ),
                         const SizedBox(height: 20),
                         // Connector + Power grid
@@ -326,7 +362,9 @@ class _AddStationScreenState extends ConsumerState<AddStationScreen> {
                                   )
                                 : ClipRRect(
                                     borderRadius: BorderRadius.circular(10),
-                                    child: Image.file(_image!, fit: BoxFit.cover, width: double.infinity),
+                                    child: (kIsWeb 
+                                        ? Image.network(_image!.path, fit: BoxFit.cover, width: double.infinity)
+                                        : Image.file(File(_image!.path), fit: BoxFit.cover, width: double.infinity)),
                                   ),
                           ),
                         ),
@@ -484,7 +522,8 @@ class _GhostButton extends StatelessWidget {
   final IconData icon;
   final String label;
   final VoidCallback onTap;
-  const _GhostButton({required this.icon, required this.label, required this.onTap});
+  final bool isLoading;
+  const _GhostButton({required this.icon, required this.label, required this.onTap, this.isLoading = false});
 
   @override
   Widget build(BuildContext context) {
@@ -501,9 +540,15 @@ class _GhostButton extends StatelessWidget {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, color: AppColors.primary, size: 18),
+            if (isLoading)
+              const Padding(
+                padding: EdgeInsets.only(right: 10),
+                child: SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary)),
+              )
+            else
+              Icon(icon, color: AppColors.primary, size: 18),
             const SizedBox(width: 8),
-            Text(label, style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.w600, fontSize: 14)),
+            Text(label, style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.w600, fontSize: 13)),
           ],
         ),
       ),

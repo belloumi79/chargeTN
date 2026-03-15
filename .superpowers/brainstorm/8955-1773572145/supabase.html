@@ -1,0 +1,39 @@
+<h2>Supabase Config Checklist ⚡</h2>
+<p class="subtitle">I couldn't bypass the login screen to check automatically, so please verify these 3 points in your Supabase Dashboard.</p>
+
+<div class="section">
+  <div class="options" data-multiselect>
+    <div class="option" data-choice="provider-enabled" onclick="toggleSelect(this)">
+      <div class="letter">1</div>
+      <div class="content">
+        <h3>Facebook Provider Enabled</h3>
+        <p>Go to Authentication -> Providers -> Facebook. Ensure the toggle is <b>ON</b>.</p>
+      </div>
+    </div>
+    <div class="option" data-choice="secret-check" onclick="toggleSelect(this)">
+      <div class="letter">2</div>
+      <div class="content">
+        <h3>App Secret Verification</h3>
+        <p>Double-check that the <b>App Secret</b> matches the one in your Facebook Dashboard (Settings -> Basic).</p>
+      </div>
+    </div>
+    <div class="option" data-choice="redirect-uri" onclick="toggleSelect(this)">
+      <div class="letter">3</div>
+      <div class="content">
+        <h3>Client ID (App ID)</h3>
+        <p>Ensure the Client ID is exactly <code>26587514167520216</code>.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>Why the Key Hash is still the #1 suspect</h3>
+  <p>Even if Supabase is perfect, Facebook will <b>block the connection</b> before the user ever sees a login screen if the Key Hash doesn't match the one sending the request.</p>
+  <div class="mockup">
+     <div class="mock-content" style="background:#fff3cd; color:#856404; border:1px solid #ffeeba; padding:15px; border-radius:8px;">
+        "L'application n'est pas configurée : Cette application n'a pas de configuration Android valide."
+     </div>
+     <p style="font-size:0.8em; margin-top:5px; text-align:center">Common error message when Key Hash is wrong.</p>
+  </div>
+</div>

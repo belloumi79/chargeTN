@@ -10,6 +10,7 @@ import '../core/app_colors.dart';
 import '../core/supabase_client.dart';
 import '../widgets/app_bottom_nav.dart';
 import '../widgets/responsive_wrapper.dart';
+import '../providers/notifications_provider.dart';
 
 class HomeMapScreen extends ConsumerStatefulWidget {
   const HomeMapScreen({super.key});
@@ -21,7 +22,12 @@ class HomeMapScreen extends ConsumerStatefulWidget {
 class _HomeMapScreenState extends ConsumerState<HomeMapScreen> {
   final TextEditingController _searchController = TextEditingController();
   int _activeFilter = 0;
-  final List<String> _filters = ['Toutes prises', 'Charge Rapide', 'Gratuit', 'Disponible'];
+  final List<String> _filters = [
+    'Toutes prises',
+    'Charge Rapide',
+    'Gratuit',
+    'Disponible',
+  ];
   final MapController _mapController = MapController();
   bool _isSatelliteMode = false;
 
@@ -68,7 +74,27 @@ class _HomeMapScreenState extends ConsumerState<HomeMapScreen> {
           // ── Map layer ──────────────────────────────────────────────────────
           stationsAsync.when(
             data: (stations) {
-              final markers = stations.map((station) {
+              final filteredStations = stations.where((s) {
+                if (!s.verified) return false;
+                switch (_activeFilter) {
+                  case 0: return true; // Tous
+                  case 1: // Disponible
+                    final sLow = s.statut.toLowerCase();
+                    return sLow.contains('fonct') || sLow.contains('disp') || sLow.contains('ouvert');
+                  case 2: // Rapide
+                    return s.puissanceKw.any((p) {
+                      final cleanP = p.toLowerCase().replaceAll('kw', '').replaceAll(' ', '').trim();
+                      return (double.tryParse(cleanP) ?? 0) >= 50;
+                    });
+                  case 3: // Gratuit (Placeholder)
+                    return true;
+                  case 4: // Type 2
+                    return s.typePrise.any((t) => t.toLowerCase().contains('type 2'));
+                  default: return true;
+                }
+              }).toList();
+
+              final markers = filteredStations.map((station) {
                 final color = AppColors.statusColor(station.statut);
                 return Marker(
                   point: LatLng(station.latitude, station.longitude),
@@ -84,12 +110,15 @@ class _HomeMapScreenState extends ConsumerState<HomeMapScreen> {
               return FlutterMap(
                 mapController: _mapController,
                 options: const MapOptions(
-                  initialCenter: LatLng(36.8, 10.1), // Center on Tunis by default
+                  initialCenter: LatLng(
+                    36.8,
+                    10.1,
+                  ), // Center on Tunis by default
                   initialZoom: 10.0,
                 ),
                 children: [
                   TileLayer(
-                    urlTemplate: _isSatelliteMode 
+                    urlTemplate: _isSatelliteMode
                         ? 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'
                         : 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                     userAgentPackageName: 'com.example.charge_tn',
@@ -111,7 +140,10 @@ class _HomeMapScreenState extends ConsumerState<HomeMapScreen> {
                           child: Center(
                             child: Text(
                               clusterMarkers.length.toString(),
-                              style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+                              style: const TextStyle(
+                                color: Colors.black,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                           ),
                         );
@@ -140,7 +172,9 @@ class _HomeMapScreenState extends ConsumerState<HomeMapScreen> {
                       decoration: BoxDecoration(
                         color: AppColors.surfaceDark.withValues(alpha: 0.95),
                         borderRadius: BorderRadius.circular(999),
-                        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+                        border: Border.all(
+                          color: Colors.white.withValues(alpha: 0.08),
+                        ),
                         boxShadow: [
                           BoxShadow(
                             color: Colors.black.withValues(alpha: 0.3),
@@ -160,17 +194,28 @@ class _HomeMapScreenState extends ConsumerState<HomeMapScreen> {
                             ),
                             child: ClipRRect(
                               borderRadius: BorderRadius.circular(18),
-                              child: Image.asset('assets/images/logo.png', fit: BoxFit.contain, width: 24, height: 24),
+                              child: Image.asset(
+                                'assets/images/logo.png',
+                                fit: BoxFit.contain,
+                                width: 24,
+                                height: 24,
+                              ),
                             ),
                           ),
                           const SizedBox(width: 8),
                           Expanded(
                             child: TextField(
                               controller: _searchController,
-                              style: const TextStyle(color: Colors.white, fontSize: 14),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 14,
+                              ),
                               decoration: InputDecoration(
                                 hintText: 'Rechercher des bornes...',
-                                hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.3), fontSize: 14),
+                                hintStyle: TextStyle(
+                                  color: Colors.white.withValues(alpha: 0.3),
+                                  fontSize: 14,
+                                ),
                                 border: InputBorder.none,
                                 contentPadding: EdgeInsets.zero,
                                 isDense: true,
@@ -179,8 +224,28 @@ class _HomeMapScreenState extends ConsumerState<HomeMapScreen> {
                             ),
                           ),
                           IconButton(
-                            icon: Icon(Icons.search, color: Colors.white.withValues(alpha: 0.5)),
+                            icon: Icon(
+                              Icons.search,
+                              color: Colors.white.withValues(alpha: 0.5),
+                            ),
                             onPressed: () => context.push('/search'),
+                          ),
+                          Consumer(
+                            builder: (context, ref, child) {
+                              final unreadCount = ref.watch(unreadNotificationsCountProvider);
+                              return Badge(
+                                label: Text('$unreadCount'),
+                                isLabelVisible: unreadCount > 0,
+                                backgroundColor: Colors.redAccent,
+                                child: IconButton(
+                                  icon: Icon(
+                                    Icons.notifications_none,
+                                    color: Colors.white.withValues(alpha: 0.5),
+                                  ),
+                                  onPressed: () => context.push('/notifications'),
+                                ),
+                              );
+                            },
                           ),
                           Container(
                             width: 1,
@@ -188,7 +253,10 @@ class _HomeMapScreenState extends ConsumerState<HomeMapScreen> {
                             color: Colors.white.withValues(alpha: 0.1),
                           ),
                           IconButton(
-                            icon: Icon(Icons.tune, color: Colors.white.withValues(alpha: 0.5)),
+                            icon: Icon(
+                              Icons.tune,
+                              color: Colors.white.withValues(alpha: 0.5),
+                            ),
                             onPressed: () => _showFilterDrawer(context),
                           ),
                         ],
@@ -207,25 +275,45 @@ class _HomeMapScreenState extends ConsumerState<HomeMapScreen> {
                               onTap: () => setState(() => _activeFilter = i),
                               child: AnimatedContainer(
                                 duration: const Duration(milliseconds: 180),
-                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 8,
+                                ),
                                 decoration: BoxDecoration(
                                   color: active
                                       ? AppColors.primary
-                                      : AppColors.surfaceDark.withValues(alpha: 0.85),
+                                      : AppColors.surfaceDark.withValues(
+                                          alpha: 0.85,
+                                        ),
                                   borderRadius: BorderRadius.circular(999),
                                   border: active
                                       ? null
-                                      : Border.all(color: Colors.white.withValues(alpha: 0.1)),
+                                      : Border.all(
+                                          color: Colors.white.withValues(
+                                            alpha: 0.1,
+                                          ),
+                                        ),
                                   boxShadow: active
-                                      ? [BoxShadow(color: AppColors.primary.withValues(alpha: 0.25), blurRadius: 8)]
+                                      ? [
+                                          BoxShadow(
+                                            color: AppColors.primary.withValues(
+                                              alpha: 0.25,
+                                            ),
+                                            blurRadius: 8,
+                                          ),
+                                        ]
                                       : [],
                                 ),
                                 child: Text(
                                   _filters[i],
                                   style: TextStyle(
-                                    color: active ? AppColors.backgroundDark : Colors.white.withValues(alpha: 0.7),
+                                    color: active
+                                        ? AppColors.backgroundDark
+                                        : Colors.white.withValues(alpha: 0.7),
                                     fontSize: 12,
-                                    fontWeight: active ? FontWeight.w700 : FontWeight.w500,
+                                    fontWeight: active
+                                        ? FontWeight.w700
+                                        : FontWeight.w500,
                                   ),
                                 ),
                               ),
@@ -250,13 +338,14 @@ class _HomeMapScreenState extends ConsumerState<HomeMapScreen> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   _MapButton(
-                    icon: _isSatelliteMode ? Icons.map : Icons.layers_outlined, 
-                    onTap: () => setState(() => _isSatelliteMode = !_isSatelliteMode)
+                    icon: _isSatelliteMode ? Icons.map : Icons.layers_outlined,
+                    onTap: () =>
+                        setState(() => _isSatelliteMode = !_isSatelliteMode),
                   ),
                   const SizedBox(height: 10),
                   _MapButton(
-                    icon: Icons.near_me, 
-                    onTap: () => _checkLocationPermission()
+                    icon: Icons.near_me,
+                    onTap: () => _checkLocationPermission(),
                   ),
                 ],
               ),
@@ -292,7 +381,9 @@ class _HomeMapScreenState extends ConsumerState<HomeMapScreen> {
 
           // ── Bottom Nav ─────────────────────────────────────────────────────
           Positioned(
-            bottom: 0, left: 0, right: 0,
+            bottom: 0,
+            left: 0,
+            right: 0,
             child: AppBottomNav(
               currentIndex: 0,
               onTap: (i) {
@@ -324,25 +415,66 @@ class _HomeMapScreenState extends ConsumerState<HomeMapScreen> {
         child: Column(
           children: [
             const SizedBox(height: 12),
-            Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2))),
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.white24,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
             const Padding(
               padding: EdgeInsets.symmetric(vertical: 20),
-              child: Text('Filtres avancés', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+              child: Text(
+                'Filtres avancés',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
             ),
-            const Expanded(child: Center(child: Text('Options de filtrage Stitch...', style: TextStyle(color: Colors.white54)))),
+            const Expanded(
+              child: Center(
+                child: Text(
+                  'Options de filtrage Stitch...',
+                  style: TextStyle(color: Colors.white54),
+                ),
+              ),
+            ),
           ],
         ),
       ),
     );
   }
 
-  Widget _darkModeTileBuilder(BuildContext context, Widget tileWidget, TileImage tile) {
+  Widget _darkModeTileBuilder(
+    BuildContext context,
+    Widget tileWidget,
+    TileImage tile,
+  ) {
     return ColorFiltered(
       colorFilter: const ColorFilter.matrix([
-        -1, 0, 0, 0, 255,
-        0, -1, 0, 0, 255,
-        0, 0, -1, 0, 255,
-        0, 0, 0, 1, 0,
+        -1,
+        0,
+        0,
+        0,
+        255,
+        0,
+        -1,
+        0,
+        0,
+        255,
+        0,
+        0,
+        -1,
+        0,
+        255,
+        0,
+        0,
+        0,
+        1,
+        0,
       ]),
       child: tileWidget,
     );
@@ -365,11 +497,7 @@ class _StitchMarker extends StatelessWidget {
             Icon(Icons.location_on, color: color, size: 44),
             Padding(
               padding: const EdgeInsets.only(top: 6),
-              child: Icon(
-                Icons.ev_station,
-                color: Colors.white,
-                size: 18,
-              ),
+              child: Icon(Icons.ev_station, color: Colors.white, size: 18),
             ),
           ],
         ),
@@ -394,7 +522,12 @@ class _MapButton extends StatelessWidget {
           color: AppColors.surfaceDark.withValues(alpha: 0.9),
           borderRadius: BorderRadius.circular(10),
           border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
-          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.3), blurRadius: 8)],
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.3),
+              blurRadius: 8,
+            ),
+          ],
         ),
         child: Icon(icon, color: AppColors.textSecondary, size: 20),
       ),

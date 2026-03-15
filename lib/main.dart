@@ -15,9 +15,11 @@ import 'screens/my_reports_screen.dart';
 import 'screens/admin_panel_screen.dart';
 import 'screens/search_list_screen.dart';
 import 'screens/add_station_screen.dart';
+import 'screens/in_app_navigation_screen.dart';
 import 'screens/profile_screen.dart';
 import 'screens/favorites_screen.dart';
 import 'screens/social_screen.dart';
+import 'screens/notifications_screen.dart';
 
 import 'package:flutter_localizations/flutter_localizations.dart';
 
@@ -27,6 +29,7 @@ void main() async {
   await SupabaseConfig.init();
   await Hive.initFlutter();
   await Hive.openBox('stations_cache');
+  await Hive.openBox('favorites');
 
   runApp(const ProviderScope(child: MyApp()));
 }
@@ -46,10 +49,7 @@ class MyApp extends StatelessWidget {
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
       ],
-      supportedLocales: const [
-        Locale('fr'),
-        Locale('ar'),
-      ],
+      supportedLocales: const [Locale('fr'), Locale('ar')],
       routerConfig: _router,
     );
   }
@@ -82,7 +82,9 @@ class MyApp extends StatelessWidget {
           backgroundColor: AppColors.primary,
           foregroundColor: Colors.white,
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
           elevation: 0,
         ),
       ),
@@ -111,23 +113,23 @@ class MyApp extends StatelessWidget {
 final _router = GoRouter(
   initialLocation: '/',
   routes: [
-    GoRoute(
-      path: '/',
-      builder: (context, state) => const SplashScreen(),
-    ),
+    GoRoute(path: '/', builder: (context, state) => const SplashScreen()),
     GoRoute(
       path: '/auth',
       builder: (context, state) => const AuthScreen(),
       redirect: (context, state) {
-        final session = SupabaseConfig.client.auth.currentSession;
-        if (session != null) return '/home';
+        final user = SupabaseConfig.client.auth.currentUser;
+        if (user != null) {
+          final userEmail = user.email ?? '';
+          final isAdmin = user.userMetadata?['role'] == 'admin' ||
+              userEmail == 'belloumi.karim.professional@gmail.com' ||
+              userEmail == 'admin@charge.tn';
+          return isAdmin ? '/admin' : '/home';
+        }
         return null;
       },
     ),
-    GoRoute(
-      path: '/home',
-      builder: (context, state) => const HomeMapScreen(),
-    ),
+    GoRoute(path: '/home', builder: (context, state) => const HomeMapScreen()),
     GoRoute(
       path: '/station/:id',
       builder: (context, state) {
@@ -147,9 +149,13 @@ final _router = GoRouter(
       path: '/favs',
       builder: (context, state) => const FavoritesScreen(),
     ),
+    GoRoute(path: '/social', builder: (context, state) => const SocialScreen()),
     GoRoute(
-      path: '/social',
-      builder: (context, state) => const SocialScreen(),
+      path: '/navigate',
+      builder: (context, state) {
+        final station = state.extra as Station;
+        return InAppNavigationScreen(station: station);
+      },
     ),
     GoRoute(
       path: '/my_reports',
@@ -184,9 +190,17 @@ final _router = GoRouter(
         if (user == null) return '/auth';
         final role = user.userMetadata?['role'];
         final email = user.email;
-        if (role != 'admin' && email != 'belloumi.karim.professional@gmail.com') return '/home';
+        if (role != 'admin' &&
+            email != 'belloumi.karim.professional@gmail.com' &&
+            email != 'admin@charge.tn') {
+          return '/home';
+        }
         return null;
       },
+    ),
+    GoRoute(
+      path: '/notifications',
+      builder: (context, state) => const NotificationsScreen(),
     ),
   ],
 );

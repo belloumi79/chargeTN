@@ -1,4 +1,5 @@
-import 'dart:io';
+import 'dart:io' show File;
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:go_router/go_router.dart';
@@ -18,7 +19,7 @@ class SubmitReportScreen extends StatefulWidget {
 
 class _SubmitReportScreenState extends State<SubmitReportScreen> {
   final _picker = ImagePicker();
-  File? _image;
+  XFile? _image;
   String? _statut;
   String? _encombrement;
   final _notesController = TextEditingController();
@@ -57,7 +58,7 @@ class _SubmitReportScreenState extends State<SubmitReportScreen> {
     if (source != null) {
       final picked = await _picker.pickImage(source: source);
       if (picked != null) {
-        setState(() => _image = File(picked.path));
+        setState(() => _image = picked);
       }
     }
   }
@@ -98,11 +99,12 @@ class _SubmitReportScreenState extends State<SubmitReportScreen> {
       }
       
       // 2. Upload photo
-      final fileExtension = p.extension(_image!.path);
+      final fileExtension = p.extension(_image!.name);
       final fileName = '${DateTime.now().millisecondsSinceEpoch}$fileExtension';
       final path = '${user.id}/$fileName';
       
-      await SupabaseConfig.client.storage.from('proofs').upload(path, _image!);
+      final bytes = await _image!.readAsBytes();
+      await SupabaseConfig.client.storage.from('proofs').uploadBinary(path, bytes);
       final imageUrl = SupabaseConfig.client.storage.from('proofs').getPublicUrl(path);
 
       // 3. Insert Proof
@@ -150,7 +152,9 @@ class _SubmitReportScreenState extends State<SubmitReportScreen> {
                 decoration: BoxDecoration(color: Colors.grey[200], borderRadius: BorderRadius.circular(8)),
                 child: _image == null
                     ? const Icon(Icons.camera_alt, size: 50, color: Colors.grey)
-                    : Image.file(_image!, fit: BoxFit.cover),
+                    : (kIsWeb 
+                        ? Image.network(_image!.path, fit: BoxFit.cover)
+                        : Image.file(File(_image!.path), fit: BoxFit.cover)),
               ),
             ),
             const SizedBox(height: 16),

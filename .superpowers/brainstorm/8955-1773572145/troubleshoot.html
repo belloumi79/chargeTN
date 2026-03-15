@@ -1,0 +1,55 @@
+<h2>Facebook Login Troubleshooting</h2>
+<p class="subtitle">Let's narrow down where the connection is breaking.</p>
+
+<div class="options" data-multiselect>
+  <div class="option" data-choice="no-button" onclick="toggleSelect(this)">
+    <div class="letter">1</div>
+    <div class="content">
+      <h3>The button doesn't do anything</h3>
+      <p>I click 'Continuer avec Facebook' and nothing happens.</p>
+    </div>
+  </div>
+  <div class="option" data-choice="browser-fails" onclick="toggleSelect(this)">
+    <div class="letter">2</div>
+    <div class="content">
+      <h3>Browser opens but shows an error</h3>
+      <p>Facebook says "Invalid OAuth Redirect URI" or "App Not Setup".</p>
+    </div>
+  </div>
+  <div class="option" data-choice="no-redirect" onclick="toggleSelect(this)">
+    <div class="letter">3</div>
+    <div class="content">
+      <h3>Login succeeds but doesn't return to app</h3>
+      <p>I log in successfully, but I stay in the browser or it opens a blank page.</p>
+    </div>
+  </div>
+  <div class="option" data-choice="return-fail" onclick="toggleSelect(this)">
+    <div class="letter">4</div>
+    <div class="content">
+      <h3>Returns to app but I'm not logged in</h3>
+      <p>The app reopens, but shows an error or stays on the login screen.</p>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>Current Configuration Check</h3>
+  <div class="pros-cons">
+    <div class="pros">
+      <h4>What looks correct</h4>
+      <ul>
+        <li>AndroidManifest.xml Intent Filters</li>
+        <li>strings.xml (App ID & Tokens present)</li>
+        <li>AuthScreen implementation</li>
+      </ul>
+    </div>
+    <div class="cons">
+      <h4>Potential Culprits</h4>
+      <ul>
+        <li>Supabase Redirect URI whitelist</li>
+        <li>Facebook Dev Portal settings (Android Platform)</li>
+        <li>Key Hashes (Release vs Debug)</li>
+      </ul>
+    </div>
+  </div>
+</div>

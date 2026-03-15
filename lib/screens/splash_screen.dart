@@ -32,7 +32,12 @@ class _SplashScreenState extends State<SplashScreen>
       if (!mounted) return;
       final session = SupabaseConfig.client.auth.currentSession;
       if (session != null) {
-        context.go('/home');
+        final user = session.user;
+        final userEmail = user.email ?? '';
+        final isAdmin =
+            user.userMetadata?['role'] == 'admin' ||
+            userEmail == 'belloumi.karim.professional@gmail.com';
+        context.go(isAdmin ? '/admin' : '/home');
       } else {
         context.go('/auth');
       }

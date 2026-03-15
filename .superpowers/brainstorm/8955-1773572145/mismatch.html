@@ -1,0 +1,44 @@
+<h2>Conflict Detected! 🚨</h2>
+<p class="subtitle">The Key Hash in the Facebook Dashboard does not match your local development key.</p>
+
+<div class="section">
+  <div class="split">
+    <div class="mockup">
+      <div class="mockup-header" style="background:#e74c3c">Dashboard Hash (Current)</div>
+      <div class="mockup-body" style="font-family:monospace; padding:10px; background:#fdf2f2">
+        o1W/aLIKYO+JYNXtgwVFvoFMDcU=
+      </div>
+    </div>
+    <div class="mockup">
+      <div class="mockup-header" style="background:#2ecc71">Your Local Hash (Required)</div>
+      <div class="mockup-body" style="font-family:monospace; padding:10px; background:#f2fdf5">
+        i0rofRr5c2OuXHDS+x3yobUSKiI=
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>Next Steps</h3>
+  <div class="options">
+    <div class="option" data-choice="update-fb" onclick="toggleSelect(this)">
+      <div class="letter">A</div>
+      <div class="content">
+        <h3>Update Facebook Dashboard</h3>
+        <p>I will guide you through adding the correct hash to the Facebook Developer Portal.</p>
+      </div>
+    </div>
+    <div class="option" data-choice="check-app-mode" onclick="toggleSelect(this)">
+      <div class="letter">B</div>
+      <div class="content">
+        <h3>Check App "Live" Mode</h3>
+        <p>The app is currently in "Development" mode. Should we switch it to "Live"?</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <p class="label">Pro Tip</p>
+  <p>If you're using VS Code or Android Studio, make sure you're using the same keystore for all builds during development.</p>
+</div>
