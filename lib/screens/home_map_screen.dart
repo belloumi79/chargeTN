@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_map/flutter_map.dart';
@@ -72,7 +73,10 @@ class _HomeMapScreenState extends ConsumerState<HomeMapScreen> {
     try {
       final position = await Geolocator.getCurrentPosition();
       _mapController.move(LatLng(position.latitude, position.longitude), 13.0);
-    } catch (_) {}
+    } catch (e, stack) {
+      debugPrint('[HomeMapScreen] getCurrentPosition failed: $e');
+      debugPrint(stack.toString());
+    }
   }
 
   String _getTileUrl() {

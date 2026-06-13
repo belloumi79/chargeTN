@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/app_colors.dart';
@@ -15,19 +16,25 @@ class NotificationsScreen extends ConsumerWidget {
           .from('notifications')
           .update({'is_read': true})
           .eq('id', id);
-    } catch (_) {}
+    } catch (e, stack) {
+      debugPrint('[NotificationsScreen] markAsRead($id) failed: $e');
+      debugPrint(stack.toString());
+    }
   }
 
   Future<void> _markAllAsRead(List<NotificationItem> notifications) async {
     try {
       final unreadIds = notifications.where((n) => !n.isRead).map((n) => n.id).toList();
       if (unreadIds.isEmpty) return;
-      
+
       await SupabaseConfig.client
           .from('notifications')
           .update({'is_read': true})
           .inFilter('id', unreadIds);
-    } catch (_) {}
+    } catch (e, stack) {
+      debugPrint('[NotificationsScreen] markAllAsRead failed: $e');
+      debugPrint(stack.toString());
+    }
   }
 
   @override

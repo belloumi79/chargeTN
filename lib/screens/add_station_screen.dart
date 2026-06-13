@@ -1,5 +1,5 @@
 import 'dart:io' show File;
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show kIsWeb, debugPrint;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
@@ -38,7 +38,10 @@ class _AddStationScreenState extends ConsumerState<AddStationScreen> {
     try {
       Position pos = await Geolocator.getCurrentPosition();
       setState(() => _selectedPos = LatLng(pos.latitude, pos.longitude));
-    } catch (_) {}
+    } catch (e, stack) {
+      debugPrint('[AddStationScreen] getCurrentPosition failed: $e');
+      debugPrint(stack.toString());
+    }
   }
 
   @override

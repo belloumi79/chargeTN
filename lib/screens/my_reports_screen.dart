@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../core/supabase_client.dart';
 import '../core/app_colors.dart';
@@ -380,7 +381,9 @@ class _ReportStatusCard extends StatelessWidget {
   String _formatDate(DateTime dt) {
     try {
       return DateFormat('dd/MM/yyyy HH:mm').format(dt.toLocal());
-    } catch (_) {
+    } catch (e, stack) {
+      debugPrint('[MyReportsScreen] _formatDate($dt) failed: $e');
+      debugPrint(stack.toString());
       return dt.toString();
     }
   }
