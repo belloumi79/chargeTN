@@ -1,7 +1,9 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../core/auth_service.dart';
 import '../core/supabase_client.dart';
 import '../core/app_colors.dart';
 
@@ -27,11 +29,7 @@ class _AuthScreenState extends State<AuthScreen> {
     _authSubscription = SupabaseConfig.client.auth.onAuthStateChange.listen((data) {
       final session = data.session;
       if (session != null && mounted) {
-        final user = session.user;
-        final userEmail = user.email ?? '';
-        final isAdmin = user.userMetadata?['role'] == 'admin' ||
-            userEmail == 'belloumi.karim.professional@gmail.com';
-        context.go(isAdmin ? '/admin' : '/home');
+        context.go(AuthService.adminRedirectTarget(session.user));
       }
     });
   }
@@ -50,8 +48,11 @@ class _AuthScreenState extends State<AuthScreen> {
       String email = _emailController.text.trim();
       String password = _passwordController.text.trim();
 
-      // Admin shortcut
-      if (email.toLowerCase() == 'admin' && password == '123456') {
+      // Debug-only shortcut to make local QA easier. Make sure the
+      // matching account exists in Supabase Auth before relying on this.
+      // In release builds we forward the raw credentials so the regular
+      // signInWithPassword call surfaces a proper auth error.
+      if (kDebugMode && email.toLowerCase() == 'admin' && password == '123456') {
         email = 'admin@charge.tn';
       }
 
@@ -60,19 +61,16 @@ class _AuthScreenState extends State<AuthScreen> {
         password: password,
       );
       final user = SupabaseConfig.client.auth.currentUser;
-      final userEmail = user?.email ?? '';
-      final isAdmin =
-          user?.userMetadata?['role'] == 'admin' ||
-          userEmail == 'belloumi.karim.professional@gmail.com' ||
-          userEmail == 'admin@charge.tn';
-      if (mounted) context.go(isAdmin ? '/admin' : '/home');
+      if (mounted) context.go(AuthService.adminRedirectTarget(user));
     } on AuthException catch (error) {
+      AuthService.logAuthEvent('signIn failed', error: error);
       if (mounted) {
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text(error.message)));
       }
-    } catch (e) {
+    } catch (e, stack) {
+      AuthService.logAuthEvent('signIn unexpected error', error: e, stack: stack);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Une erreur est survenue')),

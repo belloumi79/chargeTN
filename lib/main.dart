@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'core/supabase_client.dart';
+import 'core/auth_service.dart';
 import 'core/app_colors.dart';
 import 'models/station.dart';
 import 'screens/splash_screen.dart';
@@ -125,14 +126,9 @@ final _router = GoRouter(
       builder: (context, state) => const AuthScreen(),
       redirect: (context, state) {
         final user = SupabaseConfig.client.auth.currentUser;
-        if (user != null) {
-          final userEmail = user.email ?? '';
-          final isAdmin = user.userMetadata?['role'] == 'admin' ||
-              userEmail == 'belloumi.karim.professional@gmail.com' ||
-              userEmail == 'admin@charge.tn';
-          return isAdmin ? '/admin' : '/home';
-        }
-        return null;
+        return AuthService.adminRedirectTarget(user) == '/auth'
+            ? null
+            : AuthService.adminRedirectTarget(user);
       },
     ),
     GoRoute(path: '/home', builder: (context, state) => const HomeMapScreen()),
@@ -183,14 +179,7 @@ final _router = GoRouter(
       redirect: (context, state) {
         final user = SupabaseConfig.client.auth.currentUser;
         if (user == null) return '/auth';
-        final role = user.userMetadata?['role'];
-        final email = user.email;
-        if (role != 'admin' &&
-            email != 'belloumi.karim.professional@gmail.com' &&
-            email != 'admin@charge.tn') {
-          return '/home';
-        }
-        return null;
+        return AuthService.isAdmin(user) ? null : '/home';
       },
     ),
     GoRoute(

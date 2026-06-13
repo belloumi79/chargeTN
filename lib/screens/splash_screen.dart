@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import '../core/auth_service.dart';
 import '../core/supabase_client.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -32,12 +33,7 @@ class _SplashScreenState extends State<SplashScreen>
       if (!mounted) return;
       final session = SupabaseConfig.client.auth.currentSession;
       if (session != null) {
-        final user = session.user;
-        final userEmail = user.email ?? '';
-        final isAdmin =
-            user.userMetadata?['role'] == 'admin' ||
-            userEmail == 'belloumi.karim.professional@gmail.com';
-        context.go(isAdmin ? '/admin' : '/home');
+        context.go(AuthService.adminRedirectTarget(session.user));
       } else {
         context.go('/onboarding');
       }
