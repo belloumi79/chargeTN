@@ -1,12 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/app_colors.dart';
 import '../core/supabase_client.dart';
-import '../providers/favorites_provider.dart';
-import '../providers/reports_provider.dart';
 import '../widgets/app_bottom_nav.dart';
-import '../widgets/responsive_wrapper.dart';
 
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
@@ -14,380 +11,18 @@ class ProfileScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final user = SupabaseConfig.client.auth.currentUser;
-    final email = user?.email ?? 'Non connecté';
-    final displayName =
-        user?.userMetadata?['name'] as String? ?? email.split('@').first;
-    final isAdmin =
-        user?.userMetadata?['role'] == 'admin' ||
-        email == 'belloumi.karim.professional@gmail.com';
-
-    final favoritesAsync = ref.watch(favoritesProvider);
-    final favoritesCount = favoritesAsync.maybeWhen(data: (ids) => ids.length, orElse: () => 0);
-    final stats = ref.watch(userStatsProvider);
-    final reportsCount = stats['total'] as int? ?? 0;
-    final points = stats['points'] as int? ?? 0;
-    final rank = stats['rank'] as String? ?? 'Débutant 🥚';
-    final nextRankPoints = stats['nextRankPoints'] as int? ?? 5;
-    final progressToNext = points / nextRankPoints;
 
     return Scaffold(
-      backgroundColor: AppColors.backgroundDark,
-      body: SafeArea(
-        child: ResponsiveWrapper(
-          child: Column(
-            children: [
-              // ── Top bar ────────────────────────────────────────────────────────
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-                child: Row(
-                  children: [
-                    const Expanded(
-                      child: Text(
-                        'Profil',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                    GestureDetector(
-                      onTap: () {},
-                      child: const Icon(
-                        Icons.edit_outlined,
-                        color: AppColors.primary,
-                        size: 22,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Expanded(
-                child: ListView(
-                  padding: const EdgeInsets.only(bottom: 20),
-                  children: [
-                    // ── Avatar section ──────────────────────────────────────────
-                    Column(
-                      children: [
-                        const SizedBox(height: 24),
-                        Stack(
-                          alignment: Alignment.center,
-                          children: [
-                            Container(
-                              width: 134,
-                              height: 134,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                gradient: LinearGradient(
-                                  colors: [
-                                    AppColors.primary,
-                                    Colors.blue.shade400,
-                                  ],
-                                  begin: Alignment.topLeft,
-                                  end: Alignment.bottomRight,
-                                ),
-                              ),
-                            ),
-                            Container(
-                              width: 124,
-                              height: 124,
-                              decoration: const BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: Color(0xFF0F170D),
-                              ),
-                              child: const Icon(
-                                Icons.person,
-                                size: 60,
-                                color: Colors.white24,
-                              ),
-                            ),
-                            Positioned(
-                              bottom: 0,
-                              right: 6,
-                              child: Container(
-                                padding: const EdgeInsets.all(8),
-                                decoration: BoxDecoration(
-                                  color: AppColors.primary,
-                                  shape: BoxShape.circle,
-                                  border: Border.all(
-                                    color: const Color(0xFF0F170D),
-                                    width: 3,
-                                  ),
-                                ),
-                                child: const Icon(
-                                  Icons.camera_alt,
-                                  color: Colors.black,
-                                  size: 16,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 16),
-                        const SizedBox(height: 24),
-                        if (isAdmin)
-                          Container(
-                            margin: const EdgeInsets.only(bottom: 12),
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: AppColors.primary.withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(color: AppColors.primary.withValues(alpha: 0.5)),
-                            ),
-                            child: const Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(Icons.verified_user, color: AppColors.primary, size: 14),
-                                SizedBox(width: 6),
-                                Text('ADMINISTRATEUR', style: TextStyle(color: AppColors.primary, fontSize: 10, fontWeight: FontWeight.bold)),
-                              ],
-                            ),
-                          ),
-                        Text(
-                          displayName,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 22,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          email,
-                          style: const TextStyle(
-                            color: AppColors.textSecondary,
-                            fontSize: 13,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.03),
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
-                          ),
-                          child: Column(
-                            children: [
-                              Text(
-                                rank,
-                                style: const TextStyle(
-                                  color: AppColors.primary,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 15,
-                                ),
-                              ),
-                              if (points < 50) ...[
-                                const SizedBox(height: 8),
-                                SizedBox(
-                                  width: 120,
-                                  height: 4,
-                                  child: ClipRRect(
-                                    borderRadius: BorderRadius.circular(2),
-                                    child: LinearProgressIndicator(
-                                      value: progressToNext,
-                                      backgroundColor: Colors.white10,
-                                      valueColor: const AlwaysStoppedAnimation(AppColors.primary),
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  '$points / $nextRankPoints pts',
-                                  style: const TextStyle(color: Colors.white24, fontSize: 10),
-                                ),
-                              ],
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 24),
-                      ],
-                    ),
-                    // ── Stats Row ─────────────────────────────────────────────
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 20),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: _StatCard(
-                              label: 'Favoris',
-                              value: favoritesAsync.maybeWhen(
-                                data: (ids) => ids.length.toString(),
-                                loading: () => '...',
-                                orElse: () => '0',
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: _StatCard(label: 'Rapports', value: reportsCount.toString()),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: _StatCard(label: 'Points', value: points.toString()),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 32),
-                    // ── Sections ──────────────────────────────────────────────
-                    Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 20,
-                        vertical: 8,
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            'Réussites',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 17,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          Text(
-                            'Voir tout',
-                            style: TextStyle(
-                              color: AppColors.primary,
-                              fontSize: 13,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    SizedBox(
-                      height: 130,
-                      child: ListView(
-                        scrollDirection: Axis.horizontal,
-                        padding: const EdgeInsets.symmetric(horizontal: 20),
-                        children: const [
-                          _AchievementCard(
-                            title: 'Contributeur Or',
-                            subtitle: 'Ajouté 10 bornes vérifiées.',
-                            icon: Icons.emoji_events,
-                            color: Colors.amber,
-                            progress: 1.0,
-                          ),
-                          SizedBox(width: 12),
-                          _AchievementCard(
-                            title: 'Top 100',
-                            subtitle: 'Parmi les meilleurs éclaireurs.',
-                            icon: Icons.workspace_premium,
-                            color: Colors.blue,
-                            progress: 0.75,
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    _SettingTile(
-                      icon: Icons.receipt_long_outlined,
-                      label: 'Mes signalements',
-                      subtitle: 'Voir mes rapports',
-                      onTap: () => context.push('/my_reports'),
-                    ),
-                    _SettingTile(
-                      icon: Icons.notifications_outlined,
-                      label: 'Notifications',
-                      subtitle: 'Gérer les alertes',
-                      onTap: () => context.push('/notifications'),
-                    ),
-                    _SettingTile(
-                      icon: Icons.dark_mode_outlined,
-                      label: 'Apparence',
-                      subtitle: 'Mode sombre activé',
-                      trailing: Container(
-                        width: 44,
-                        height: 24,
-                        decoration: BoxDecoration(
-                          color: AppColors.primary,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Align(
-                          alignment: Alignment.centerRight,
-                          child: Container(
-                            margin: const EdgeInsets.all(3),
-                            width: 18,
-                            height: 18,
-                            decoration: const BoxDecoration(
-                              color: Colors.white,
-                              shape: BoxShape.circle,
-                            ),
-                          ),
-                        ),
-                      ),
-                      onTap: () {},
-                    ),
-                    _SettingTile(
-                      icon: Icons.language,
-                      label: 'Langue',
-                      subtitle: 'Français (TN)',
-                      onTap: () {},
-                    ),
-                    if (isAdmin)
-                      _SettingTile(
-                        icon: Icons.admin_panel_settings_outlined,
-                        label: 'Administration',
-                        subtitle: 'Panneau admin',
-                        iconColor: AppColors.primary,
-                        onTap: () => context.push('/admin'),
-                      ),
-                    const SizedBox(height: 8),
-                    // Sign out – distinct red styling
-                    Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 4,
-                      ),
-                      child: GestureDetector(
-                        onTap: () async {
-                          await SupabaseConfig.client.auth.signOut();
-                          if (context.mounted) context.go('/auth');
-                        },
-                        child: Container(
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: AppColors.surfaceDark,
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Row(
-                            children: [
-                              Container(
-                                width: 40,
-                                height: 40,
-                                decoration: BoxDecoration(
-                                  color: Colors.red.withValues(alpha: 0.12),
-                                  shape: BoxShape.circle,
-                                ),
-                                child: const Icon(
-                                  Icons.logout,
-                                  color: Colors.red,
-                                  size: 20,
-                                ),
-                              ),
-                              const SizedBox(width: 14),
-                              const Text(
-                                'Se déconnecter',
-                                style: TextStyle(
-                                  color: Colors.red,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        title: const Text('Mon Profil', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+        backgroundColor: Colors.white,
+        elevation: 0,
+        actions: [
+          IconButton(icon: const Icon(Icons.settings_outlined, color: Colors.black), onPressed: () {}),
+        ],
       ),
+      body: user == null ? _buildGuestView(context) : _buildUserView(context, user),
       bottomNavigationBar: AppBottomNav(
         currentIndex: 4,
         onTap: (i) {
@@ -400,174 +35,165 @@ class ProfileScreen extends ConsumerWidget {
       ),
     );
   }
-}
 
-class _StatCard extends StatelessWidget {
-  final String label;
-  final String value;
-  const _StatCard({required this.label, required this.value});
-  @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(vertical: 16),
-    decoration: BoxDecoration(
-      color: AppColors.surfaceDark,
-      borderRadius: BorderRadius.circular(14),
-      border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
-    ),
-    child: Column(
-      children: [
-        Text(
-          value,
-          style: const TextStyle(
-            color: AppColors.primary,
-            fontSize: 24,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        const SizedBox(height: 2),
-        Text(
-          label,
-          style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
-        ),
-      ],
-    ),
-  );
-}
-
-class _AchievementCard extends StatelessWidget {
-  final String title;
-  final String subtitle;
-  final IconData icon;
-  final Color color;
-  final double progress;
-  const _AchievementCard({
-    required this.title,
-    required this.subtitle,
-    required this.icon,
-    required this.color,
-    required this.progress,
-  });
-
-  @override
-  Widget build(BuildContext context) => Container(
-    width: 220,
-    padding: const EdgeInsets.all(14),
-    decoration: BoxDecoration(
-      color: color.withValues(alpha: 0.08),
-      borderRadius: BorderRadius.circular(14),
-      border: Border.all(color: color.withValues(alpha: 0.2)),
-    ),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Container(
-          width: 36,
-          height: 36,
-          decoration: BoxDecoration(
-            color: color.withValues(alpha: 0.2),
-            shape: BoxShape.circle,
-          ),
-          child: Icon(icon, color: color, size: 20),
-        ),
-        const Spacer(),
-        Text(
-          title,
-          style: TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.bold,
-            fontSize: 13,
-          ),
-        ),
-        const SizedBox(height: 2),
-        Text(
-          subtitle,
-          style: TextStyle(color: color.withValues(alpha: 0.7), fontSize: 11),
-        ),
-        const SizedBox(height: 8),
-        ClipRRect(
-          borderRadius: BorderRadius.circular(4),
-          child: LinearProgressIndicator(
-            value: progress,
-            backgroundColor: color.withValues(alpha: 0.15),
-            valueColor: AlwaysStoppedAnimation<Color>(color),
-            minHeight: 5,
-          ),
-        ),
-      ],
-    ),
-  );
-}
-
-class _SettingTile extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final String subtitle;
-  final VoidCallback onTap;
-  final Widget? trailing;
-  final Color? iconColor;
-
-  const _SettingTile({
-    required this.icon,
-    required this.label,
-    required this.subtitle,
-    required this.onTap,
-    this.trailing,
-    this.iconColor,
-  });
-
-  @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-    child: GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: AppColors.surfaceDark,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Row(
+  Widget _buildGuestView(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: (iconColor ?? AppColors.primary).withValues(alpha: 0.12),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                icon,
-                color: iconColor ?? AppColors.primary,
-                size: 20,
-              ),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    label,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  Text(
-                    subtitle,
-                    style: const TextStyle(
-                      color: AppColors.textSecondary,
-                      fontSize: 12,
-                    ),
-                  ),
-                ],
+            const Icon(Icons.account_circle_outlined, size: 80, color: Colors.grey),
+            const SizedBox(height: 24),
+            const Text('Connectez-vous pour voir votre profil', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 12),
+            const Text('Gagnez des points Expert EV en participant à la communauté.', textAlign: TextAlign.center, style: TextStyle(color: Colors.grey)),
+            const SizedBox(height: 32),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () => context.push('/auth'),
+                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF6C63FF)),
+                child: const Text('SE CONNECTER'),
               ),
             ),
-            trailing ??
-                const Icon(Icons.chevron_right, color: AppColors.textSecondary),
           ],
         ),
       ),
-    ),
-  );
+    );
+  }
+
+  Widget _buildUserView(BuildContext context, dynamic user) {
+    return ListView(
+      padding: const EdgeInsets.all(20),
+      children: [
+        Row(
+          children: [
+            const CircleAvatar(radius: 40, child: Icon(Icons.person, size: 40)),
+            const SizedBox(width: 20),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(user.email?.split('@').first ?? 'Utilisateur', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+                Text(user.email ?? '', style: const TextStyle(color: Colors.grey)),
+                const SizedBox(height: 8),
+                _buildExpertBadge(),
+              ],
+            ),
+          ],
+        ),
+        const SizedBox(height: 40),
+        
+        // Point 5: Gamification Stats
+        _buildGamificationCard(),
+        
+        const SizedBox(height: 32),
+        const Text('Mes Activités', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 16),
+        _profileItem(Icons.history, 'Historique de charge'),
+        _profileItem(Icons.ev_station, 'Mes bornes déclarées'),
+        _profileItem(Icons.star_outline, 'Mes avis partagés'),
+        
+        const SizedBox(height: 32),
+        const Text('Économies Réalisées', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 16),
+        _buildEconomySummary(),
+        
+        const SizedBox(height: 40),
+        TextButton.icon(
+          onPressed: () async {
+            await SupabaseConfig.client.auth.signOut();
+            context.go('/auth');
+          },
+          icon: const Icon(Icons.logout, color: Colors.red),
+          label: const Text('Se déconnecter', style: TextStyle(color: Colors.red)),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildExpertBadge() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(color: const Color(0xFF11B67F).withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12)),
+      child: const Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.verified, color: Color(0xFF11B67F), size: 14),
+          SizedBox(width: 4),
+          Text('Expert EV - Niv. 4', style: TextStyle(color: Color(0xFF11B67F), fontWeight: FontWeight.bold, fontSize: 11)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildGamificationCard() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(color: const Color(0xFF6C63FF), borderRadius: BorderRadius.circular(20), boxShadow: [BoxShadow(color: const Color(0xFF6C63FF).withValues(alpha: 0.3), blurRadius: 15, offset: const Offset(0, 10))]),
+      child: Column(
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Points de Contribution', style: TextStyle(color: Colors.white70, fontSize: 12)),
+                  Text('1,250 PTS', style: TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.w900)),
+                ],
+              ),
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.2), shape: BoxShape.circle),
+                child: const Icon(Icons.emoji_events, color: Colors.white, size: 30),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          const LinearProgressIndicator(value: 0.75, backgroundColor: Colors.white24, valueColor: AlwaysStoppedAnimation<Color>(Colors.white)),
+          const SizedBox(height: 8),
+          const Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('Niveau 4', style: TextStyle(color: Colors.white70, fontSize: 11)),
+              Text('250 pts restants pour le Niv. 5', style: TextStyle(color: Colors.white70, fontSize: 11)),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEconomySummary() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(color: Colors.grey[50], borderRadius: BorderRadius.circular(16)),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
+        children: [
+          _statItem('CO2 Évité', '1.2 Tonnes'),
+          _statItem('Économie', '4,200 DT'),
+        ],
+      ),
+    );
+  }
+
+  Widget _statItem(String label, String value) {
+    return Column(
+      children: [
+        Text(value, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Color(0xFF6C63FF))),
+        Text(label, style: const TextStyle(color: Colors.grey, fontSize: 12)),
+      ],
+    );
+  }
+
+  Widget _profileItem(IconData icon, String label) {
+    return ListTile(
+      leading: Icon(icon, color: Colors.grey[700]),
+      title: Text(label),
+      trailing: const Icon(Icons.chevron_right, size: 20),
+      onTap: () {},
+    );
+  }
 }

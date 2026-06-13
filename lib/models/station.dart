@@ -16,6 +16,12 @@ class Station {
   final String? submittedBy;
   final String? approvedBy;
   final String? notes;
+  
+  // New features for Tunisian market
+  final double reliabilityScore; // 0.0 to 5.0 based on crowd reports
+  final int recentSuccessfulCharges; // Last 24h
+  final List<String> amenities; // ['cafe', 'wifi', 'shop', 'wc']
+  final bool supportsOffline;
 
   Station({
     required this.id,
@@ -35,6 +41,10 @@ class Station {
     this.submittedBy,
     this.approvedBy,
     this.notes,
+    this.reliabilityScore = 4.5,
+    this.recentSuccessfulCharges = 0,
+    this.amenities = const [],
+    this.supportsOffline = true,
   });
 
   factory Station.fromJson(Map<String, dynamic> json) {
@@ -56,6 +66,10 @@ class Station {
       submittedBy: json['submitted_by'],
       approvedBy: json['approved_by'],
       notes: json['notes'],
+      reliabilityScore: (json['reliability_score'] ?? 4.5).toDouble(),
+      recentSuccessfulCharges: json['recent_charges'] ?? 0,
+      amenities: json['amenities'] != null ? List<String>.from(json['amenities']) : [],
+      supportsOffline: json['supports_offline'] ?? true,
     );
   }
 
@@ -78,6 +92,10 @@ class Station {
       'submitted_by': submittedBy,
       'approved_by': approvedBy,
       'notes': notes,
+      'reliability_score': reliabilityScore,
+      'recent_charges': recentSuccessfulCharges,
+      'amenities': amenities,
+      'supports_offline': supportsOffline,
     };
   }
 }

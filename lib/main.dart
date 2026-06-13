@@ -20,6 +20,10 @@ import 'screens/profile_screen.dart';
 import 'screens/favorites_screen.dart';
 import 'screens/social_screen.dart';
 import 'screens/notifications_screen.dart';
+import 'screens/community_screen.dart';
+import 'screens/onboarding_screen.dart';
+import 'screens/marketplace_screen.dart';
+import 'screens/report_problem_screen.dart';
 
 import 'package:flutter_localizations/flutter_localizations.dart';
 
@@ -114,6 +118,8 @@ final _router = GoRouter(
   initialLocation: '/',
   routes: [
     GoRoute(path: '/', builder: (context, state) => const SplashScreen()),
+    GoRoute(path: '/onboarding', builder: (context, state) => const OnboardingScreen()),
+    GoRoute(path: '/marketplace', builder: (context, state) => const MarketplaceScreen()),
     GoRoute(
       path: '/auth',
       builder: (context, state) => const AuthScreen(),
@@ -149,7 +155,7 @@ final _router = GoRouter(
       path: '/favs',
       builder: (context, state) => const FavoritesScreen(),
     ),
-    GoRoute(path: '/social', builder: (context, state) => const SocialScreen()),
+    GoRoute(path: '/social', builder: (context, state) => const CommunityScreen()),
     GoRoute(
       path: '/navigate',
       builder: (context, state) {
@@ -170,18 +176,7 @@ final _router = GoRouter(
         return null;
       },
     ),
-    GoRoute(
-      path: '/report',
-      builder: (context, state) {
-        final station = state.extra as Station;
-        return SubmitReportScreen(station: station);
-      },
-      redirect: (context, state) {
-        final session = SupabaseConfig.client.auth.currentSession;
-        if (session == null) return '/auth';
-        return null;
-      },
-    ),
+    GoRoute(path: '/report_problem', builder: (context, state) => const ReportProblemScreen()),
     GoRoute(
       path: '/admin',
       builder: (context, state) => const AdminPanelScreen(),

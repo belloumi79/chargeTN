@@ -39,7 +39,7 @@ class _SplashScreenState extends State<SplashScreen>
             userEmail == 'belloumi.karim.professional@gmail.com';
         context.go(isAdmin ? '/admin' : '/home');
       } else {
-        context.go('/auth');
+        context.go('/onboarding');
       }
     });
   }
