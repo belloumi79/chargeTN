@@ -25,16 +25,22 @@ final stationsProvider = StreamProvider<List<Station>>((ref) {
       });
 });
 
-/// Helper to update the local Hive cache
+/// Helper to update the local Hive cache.
+///
+/// We write the new snapshot in two batched operations instead of N+1
+/// individual puts. For stations with hundreds of entries this is the
+/// difference between an instant refresh and a visible UI hitch on
+/// each realtime push.
 Future<void> _updateCache(Box box, List<Station> stations) async {
   try {
-    // We clear and rewrite the cache to stay in sync with the latest DB state
+    final entries = <String, Map<String, dynamic>>{
+      for (final s in stations) s.id: s.toJson(),
+    };
     await box.clear();
-    for (var station in stations) {
-      await box.put(station.id, station.toJson());
-    }
-  } catch (e) {
-    debugPrint('Error updating stations cache: $e');
+    await box.putAll(entries);
+  } catch (e, stack) {
+    debugPrint('[StationProvider] cache update failed: $e');
+    debugPrint(stack.toString());
   }
 }
 

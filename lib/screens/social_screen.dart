@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
@@ -7,8 +8,9 @@ import '../core/supabase_client.dart';
 import '../widgets/app_bottom_nav.dart';
 import '../widgets/responsive_wrapper.dart';
 import '../models/station.dart';
+import '../providers/posts_feed_provider.dart';
 
-// ─────────────────────────── Data models (local) ─────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
 
 class PostItem {
   final String id;
@@ -80,17 +82,16 @@ class CommentItem {
 
 // ─────────────────────────────── Main Screen ─────────────────────────────────
 
-class SocialScreen extends StatefulWidget {
+class SocialScreen extends ConsumerStatefulWidget {
   const SocialScreen({super.key});
 
   @override
-  State<SocialScreen> createState() => _SocialScreenState();
+  ConsumerState<SocialScreen> createState() => _SocialScreenState();
 }
 
-class _SocialScreenState extends State<SocialScreen>
+class _SocialScreenState extends ConsumerState<SocialScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
-  late Stream<List<PostItem>> _feedStream;
   final _currentUser = SupabaseConfig.client.auth.currentUser;
   Set<String> _myLikes = {};
 
@@ -98,13 +99,6 @@ class _SocialScreenState extends State<SocialScreen>
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
-
-    _feedStream = SupabaseConfig.client
-        .from('posts_detailed')
-        .stream(primaryKey: ['id'])
-        .order('created_at', ascending: false)
-        .map((maps) => maps.map((e) => PostItem.fromJson(e)).toList());
-
     _loadMyLikes();
   }
 
@@ -120,7 +114,10 @@ class _SocialScreenState extends State<SocialScreen>
           _myLikes = {for (final r in res) r['post_id'] as String};
         });
       }
-    } catch (_) {}
+    } catch (e, stack) {
+      debugPrint('[SocialScreen] _loadMyLikes failed: $e');
+      debugPrint(stack.toString());
+    }
   }
 
   Future<void> _toggleLike(PostItem post) async {
@@ -139,7 +136,10 @@ class _SocialScreenState extends State<SocialScreen>
           _myLikes.remove(post.id);
         }
       });
-    } catch (_) {}
+    } catch (e, stack) {
+      debugPrint('[SocialScreen] _toggleLike(${post.id}) failed: $e');
+      debugPrint(stack.toString());
+    }
   }
 
   Future<void> _deletePost(String postId) async {
@@ -276,56 +276,59 @@ class _SocialScreenState extends State<SocialScreen>
   }
 
   Widget _buildFeed(bool sortByLikes) {
-    return StreamBuilder<List<PostItem>>(
-      stream: _feedStream,
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator(color: AppColors.primary));
-        }
-
-        var posts = snapshot.data ?? [];
+    final feedAsync = ref.watch(postsFeedProvider);
+    final posts = feedAsync.maybeWhen(
+      data: (data) {
         if (sortByLikes) {
-          posts = [...posts]..sort((a, b) => b.likesCount.compareTo(a.likesCount));
+          final sorted = [...data];
+          sorted.sort((a, b) => b.likesCount.compareTo(a.likesCount));
+          return sorted;
         }
-
-        if (posts.isEmpty) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(Icons.chat_bubble_outline, size: 60, color: Colors.white10),
-                const SizedBox(height: 16),
-                const Text('Soyez le premier à publier !',
-                    style: TextStyle(color: Colors.white38, fontSize: 15)),
-                const SizedBox(height: 20),
-                ElevatedButton.icon(
-                  onPressed: _openCreatePost,
-                  icon: const Icon(Icons.add),
-                  label: const Text('Créer un post'),
-                ),
-              ],
-            ),
-          );
-        }
-
-        return RefreshIndicator(
-          color: AppColors.primary,
-          backgroundColor: AppColors.surfaceDark,
-          onRefresh: _loadMyLikes,
-          child: ListView.builder(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-            itemCount: posts.length,
-            itemBuilder: (context, i) => _PostCard(
-              post: posts[i],
-              isLiked: _myLikes.contains(posts[i].id),
-              isOwner: _currentUser?.id == posts[i].userId,
-              onLike: () => _toggleLike(posts[i]),
-              onDelete: () => _deletePost(posts[i].id),
-              onComment: () => _openComments(posts[i]),
-            ),
-          ),
-        );
+        return data;
       },
+      orElse: () => const <PostItem>[],
+    );
+
+    if (feedAsync.isLoading && posts.isEmpty) {
+      return const Center(child: CircularProgressIndicator(color: AppColors.primary));
+    }
+
+    if (posts.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.chat_bubble_outline, size: 60, color: Colors.white10),
+            const SizedBox(height: 16),
+            const Text('Soyez le premier à publier !',
+                style: TextStyle(color: Colors.white38, fontSize: 15)),
+            const SizedBox(height: 20),
+            ElevatedButton.icon(
+              onPressed: _openCreatePost,
+              icon: const Icon(Icons.add),
+              label: const Text('Créer un post'),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return RefreshIndicator(
+      color: AppColors.primary,
+      backgroundColor: AppColors.surfaceDark,
+      onRefresh: _loadMyLikes,
+      child: ListView.builder(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+        itemCount: posts.length,
+        itemBuilder: (context, i) => _PostCard(
+          post: posts[i],
+          isLiked: _myLikes.contains(posts[i].id),
+          isOwner: _currentUser?.id == posts[i].userId,
+          onLike: () => _toggleLike(posts[i]),
+          onDelete: () => _deletePost(posts[i].id),
+          onComment: () => _openComments(posts[i]),
+        ),
+      ),
     );
   }
 
@@ -388,7 +391,10 @@ class _PostCard extends StatelessWidget {
       if (context.mounted) {
         context.push('/station/${post.stationId}', extra: Station.fromJson(res));
       }
-    } catch (_) {}
+    } catch (e, stack) {
+      debugPrint('[SocialScreen] _goToStation(${post.stationId}) failed: $e');
+      debugPrint(stack.toString());
+    }
   }
 
   void _showLikers(BuildContext context) {

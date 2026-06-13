@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/supabase_client.dart';
 import '../models/station.dart';
@@ -33,29 +34,36 @@ class FavoritesNotifier extends AsyncNotifier<Set<String>> {
     final user = SupabaseConfig.client.auth.currentUser;
     if (user == null) return;
 
-    final currentIds = state.value ?? {};
+    final currentIds = state.value ?? <String>{};
     final isFav = currentIds.contains(stationId);
+    // Snapshot the previous value so we can roll back if the DB write fails.
+    final previousIds = Set<String>.from(currentIds);
+
+    // Optimistic update so the heart icon flips immediately.
+    if (isFav) {
+      state = AsyncData(Set<String>.from(currentIds)..remove(stationId));
+    } else {
+      state = AsyncData({...currentIds, stationId});
+    }
 
     try {
       if (isFav) {
-        // Remove from DB
         await SupabaseConfig.client
             .from('favorites')
             .delete()
             .match({'user_id': user.id, 'station_id': stationId});
-        
-        state = AsyncData(Set.from(currentIds)..remove(stationId));
       } else {
-        // Add to DB
         await SupabaseConfig.client.from('favorites').insert({
           'user_id': user.id,
           'station_id': stationId,
         });
-        
-        state = AsyncData({...currentIds, stationId});
       }
-    } catch (e) {
-      // Potentially handle error
+    } catch (e, stack) {
+      // Roll back the optimistic update so the UI matches reality.
+      debugPrint('[Favorites] toggleFavorite($stationId) failed: $e');
+      debugPrint(stack.toString());
+      state = AsyncData(previousIds);
+      rethrow;
     }
   }
 

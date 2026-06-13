@@ -1,50 +1,28 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../core/supabase_client.dart';
 import '../core/app_colors.dart';
 import '../models/report.dart';
+import '../providers/admin_providers.dart';
 
-class AdminPanelScreen extends StatefulWidget {
+class AdminPanelScreen extends ConsumerStatefulWidget {
   const AdminPanelScreen({super.key});
 
   @override
-  State<AdminPanelScreen> createState() => _AdminPanelScreenState();
+  ConsumerState<AdminPanelScreen> createState() => _AdminPanelScreenState();
 }
 
-class _AdminPanelScreenState extends State<AdminPanelScreen>
+class _AdminPanelScreenState extends ConsumerState<AdminPanelScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
-  late Stream<List<Report>> _reportsStream;
-  late Stream<List<Map<String, dynamic>>> _stationsStream;
   late Future<List<Map<String, dynamic>>> _usersFuture;
-  bool _showAllStations = false;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
-
-    // Real-time stream: pending reports enriched with station + user info
-    _reportsStream = SupabaseConfig.client
-        .from('reports_detailed')
-        .stream(primaryKey: ['id'])
-        .eq('status', 'pending')
-        .order('created_at', ascending: true)
-        .map((maps) => maps.map((e) => Report.fromJson(e)).toList());
-
-    _initStationsStream();
     _usersFuture = _fetchUsers();
-  }
-
-  void _initStationsStream() {
-    _stationsStream = (_showAllStations
-            ? SupabaseConfig.client.from('stations').stream(primaryKey: ['id'])
-            : SupabaseConfig.client
-                .from('stations')
-                .stream(primaryKey: ['id'])
-                .eq('verified', false))
-        .order('created_at', ascending: true)
-        .map((maps) => List<Map<String, dynamic>>.from(maps));
   }
 
   Future<List<Map<String, dynamic>>> _fetchUsers() async {
@@ -296,39 +274,42 @@ class _AdminPanelScreenState extends State<AdminPanelScreen>
   // ── Tab 1: Reports ────────────────────────────────────────────────────────
 
   Widget _buildReportsTab() {
-    return StreamBuilder<List<Report>>(
-      stream: _reportsStream,
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        }
-        final reports = snapshot.data ?? [];
-        if (reports.isEmpty) {
-          return _buildEmpty('✅ Aucun signalement en attente', Icons.check_circle_outline);
-        }
-        return ListView.builder(
-          padding: const EdgeInsets.all(16),
-          itemCount: reports.length,
-          itemBuilder: (context, i) => _AdminReportCard(
-            report: reports[i],
-            onApprove: () async {
-              final notes = await _showNotesDialog('Approuver le signalement', 'Approuver', Colors.green);
-              if (mounted) await _approveReport(reports[i], adminNotes: notes);
-            },
-            onReject: () async {
-              final notes = await _showNotesDialog('Rejeter le signalement', 'Rejeter', Colors.red);
-              if (mounted) await _rejectReport(reports[i], adminNotes: notes);
-            },
-            onShowVotes: (type) => _showReportVotes(reports[i].id, type),
-          ),
-        );
-      },
+    final reportsAsync = ref.watch(pendingReportsProvider);
+    final reports = reportsAsync.maybeWhen(data: (d) => d, orElse: () => const <Report>[]);
+    if (reportsAsync.isLoading && reports.isEmpty) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (reports.isEmpty) {
+      return _buildEmpty('✅ Aucun signalement en attente', Icons.check_circle_outline);
+    }
+    return ListView.builder(
+      padding: const EdgeInsets.all(16),
+      itemCount: reports.length,
+      itemBuilder: (context, i) => _AdminReportCard(
+        report: reports[i],
+        onApprove: () async {
+          final notes = await _showNotesDialog('Approuver le signalement', 'Approuver', Colors.green);
+          if (mounted) await _approveReport(reports[i], adminNotes: notes);
+        },
+        onReject: () async {
+          final notes = await _showNotesDialog('Rejeter le signalement', 'Rejeter', Colors.red);
+          if (mounted) await _rejectReport(reports[i], adminNotes: notes);
+        },
+        onShowVotes: (type) => _showReportVotes(reports[i].id, type),
+      ),
     );
   }
 
   // ── Tab 2: Stations ───────────────────────────────────────────────────────
 
   Widget _buildStationsTab() {
+    final showAll = ref.watch(showAllStationsProvider);
+    final stationsAsync = ref.watch(adminStationsProvider);
+    final stations = stationsAsync.maybeWhen(
+      data: (d) => d,
+      orElse: () => const <Map<String, dynamic>>[],
+    );
+
     return Column(
       children: [
         Padding(
@@ -339,60 +320,47 @@ class _AdminPanelScreenState extends State<AdminPanelScreen>
               const SizedBox(width: 8),
               ChoiceChip(
                 label: const Text('À vérifier', style: TextStyle(fontSize: 12)),
-                selected: !_showAllStations,
+                selected: !showAll,
                 onSelected: (val) {
                   if (val) {
-                    setState(() {
-                      _showAllStations = false;
-                      _initStationsStream();
-                    });
+                    ref.read(showAllStationsProvider.notifier).set(false);
                   }
                 },
                 selectedColor: AppColors.primary.withValues(alpha: 0.2),
-                labelStyle: TextStyle(color: !_showAllStations ? AppColors.primary : Colors.white38),
+                labelStyle: TextStyle(color: !showAll ? AppColors.primary : Colors.white38),
               ),
               const SizedBox(width: 8),
               ChoiceChip(
                 label: const Text('Toutes', style: TextStyle(fontSize: 12)),
-                selected: _showAllStations,
+                selected: showAll,
                 onSelected: (val) {
                   if (val) {
-                    setState(() {
-                      _showAllStations = true;
-                      _initStationsStream();
-                    });
+                    ref.read(showAllStationsProvider.notifier).set(true);
                   }
                 },
                 selectedColor: AppColors.primary.withValues(alpha: 0.2),
-                labelStyle: TextStyle(color: _showAllStations ? AppColors.primary : Colors.white38),
+                labelStyle: TextStyle(color: showAll ? AppColors.primary : Colors.white38),
               ),
             ],
           ),
         ),
         Expanded(
-          child: StreamBuilder<List<Map<String, dynamic>>>(
-            stream: _stationsStream,
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) {
-                return const Center(child: CircularProgressIndicator());
-              }
-              final stations = snapshot.data ?? [];
-              if (stations.isEmpty) {
-                return _buildEmpty(
-                    _showAllStations ? 'Aucune borne trouvée' : '✅ Aucune borne à vérifier',
-                    Icons.electric_bolt_outlined);
-              }
-              return ListView.builder(
-                padding: const EdgeInsets.all(16),
-                itemCount: stations.length,
-                itemBuilder: (context, i) => _StationAdminCard(
-                  station: stations[i],
-                  onVerify: () => _verifyStation(stations[i]['id']),
-                  onDelete: () => _deleteStation(stations[i]['id']),
-                ),
-              );
-            },
-          ),
+          child: stationsAsync.isLoading && stations.isEmpty
+              ? const Center(child: CircularProgressIndicator())
+              : stations.isEmpty
+                  ? _buildEmpty(
+                      showAll ? 'Aucune borne trouvée' : '✅ Aucune borne à vérifier',
+                      Icons.electric_bolt_outlined,
+                    )
+                  : ListView.builder(
+                      padding: const EdgeInsets.all(16),
+                      itemCount: stations.length,
+                      itemBuilder: (context, i) => _StationAdminCard(
+                        station: stations[i],
+                        onVerify: () => _verifyStation(stations[i]['id']),
+                        onDelete: () => _deleteStation(stations[i]['id']),
+                      ),
+                    ),
         ),
       ],
     );
